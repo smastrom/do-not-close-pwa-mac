@@ -1,4 +1,4 @@
-# DoNotClosePWA
+# DoNotClosePWA for Mac
 
 A [Hammerspoon](https://www.hammerspoon.org/) Spoon that makes PWA windows on macOS behave like native apps: **clicking the red close button hides the window instead of quitting the app**.
 
@@ -31,8 +31,8 @@ Think of it like: Hammerspoon is the engine, Spoons are the plugins.
 ### Quick install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/do-not-close-pwa.git
-cd do-not-close-pwa
+git clone https://github.com/smastrom/do-not-close-pwa-mac.git
+cd do-not-close-pwa-mac
 bash install.sh
 ```
 
@@ -131,6 +131,34 @@ The Spoon uses two Hammerspoon [event taps](https://www.hammerspoon.org/docs/hs.
 1. **Mouse tap** - listens for `leftMouseDown` events. When a click occurs, it checks if the frontmost app is a PWA and whether the click landed on the window's close button (using the macOS Accessibility API to find the real button position). If so, it hides the app and swallows the click.
 
 2. **Keyboard tap** - listens for `keyDown` events. When `Cmd+W` or `Cmd+Q` is pressed in a PWA, it hides the app instead. `Cmd+Option+Q` is left untouched as an escape hatch to actually quit.
+
+## Uninstall
+
+### Quick uninstall
+
+```bash
+# Remove the Spoon
+rm -rf ~/.hammerspoon/Spoons/DoNotClosePWA.spoon
+
+# Remove the config lines from init.lua
+sed -i '' '/DoNotClosePWA/d' ~/.hammerspoon/init.lua
+
+# Reload Hammerspoon
+open -g "hammerspoon://reloadconfig"
+```
+
+### Manual uninstall
+
+1. Delete `~/.hammerspoon/Spoons/DoNotClosePWA.spoon/`
+2. Remove the `DoNotClosePWA` lines from `~/.hammerspoon/init.lua`
+3. Reload Hammerspoon (menu bar icon > Reload Config)
+
+If you also want to remove Hammerspoon entirely:
+
+```bash
+brew uninstall --cask hammerspoon
+rm -rf ~/.hammerspoon
+```
 
 ## Requirements
 
