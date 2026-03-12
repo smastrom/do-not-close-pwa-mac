@@ -1,10 +1,10 @@
 --- === DoNotClosePWA ===
 ---
---- Previene la chiusura delle finestre PWA su macOS.
---- Quando si clicca il pulsante rosso o si usa Cmd+W/Cmd+Q,
---- la PWA viene nascosta invece di essere chiusa.
+--- Prevents PWA windows from being closed on macOS.
+--- When clicking the red close button or using Cmd+W/Cmd+Q,
+--- the PWA is hidden instead of being closed.
 ---
---- Per chiudere davvero una PWA: Cmd+Option+Q oppure tasto destro Dock > Esci
+--- To actually close a PWA: Cmd+Option+Q or right-click Dock > Quit
 
 local obj = {}
 obj.__index = obj
@@ -16,8 +16,8 @@ obj.author = "PWA Guardian"
 obj.license = "MIT"
 
 --- DoNotClosePWA.pwaPatterns
---- Bundle ID patterns (Lua patterns) che identificano le PWA.
---- I pattern usano % come escape per i punti letterali.
+--- Bundle ID patterns (Lua patterns) that identify PWAs.
+--- Patterns use % as escape for literal dots.
 obj.pwaPatterns = {
     "^com%.google%.Chrome.*app%.",          -- Chrome PWAs (stable, beta, canary)
     "^com%.microsoft%.edgemac.*app%.",       -- Edge PWAs (stable, dev, beta)
@@ -26,14 +26,14 @@ obj.pwaPatterns = {
 }
 
 --- DoNotClosePWA.additionalApps
---- Nomi aggiuntivi di app da trattare come PWA (lista manuale)
+--- Additional app names to treat as PWAs (manual list)
 obj.additionalApps = {}
 
 local mouseTap = nil
 local keyTap = nil
 local logger = hs.logger.new("DoNotClosePWA", "info")
 
---- Controlla se un'app e' una PWA in base al bundle ID o al nome
+--- Checks if an app is a PWA based on its bundle ID or name
 local function isPWA(app)
     if not app then return false end
     local bid = app:bundleID()
@@ -51,10 +51,10 @@ local function isPWA(app)
     return false
 end
 
---- Controlla se il click del mouse e' sul pulsante rosso (chiudi) della finestra.
---- Usa prima l'Accessibility API (piu' precisa), poi un fallback a coordinate.
+--- Checks if the mouse click is on the window's close (red) button.
+--- Uses Accessibility API first (more accurate), then falls back to coordinates.
 local function isClickOnCloseButton(mousePos, win)
-    -- Metodo 1: Accessibility API (trova il pulsante reale)
+    -- Method 1: Accessibility API (finds the real button)
     local ok, axWin = pcall(hs.axuielement.windowElement, win)
     if ok and axWin then
         local closeBtn = axWin:attributeValue("AXCloseButton")
@@ -70,18 +70,18 @@ local function isClickOnCloseButton(mousePos, win)
         end
     end
 
-    -- Metodo 2: Fallback basato su coordinate
-    -- Il pulsante rosso e' circa a (14, 14) dall'angolo in alto a sinistra della finestra
+    -- Method 2: Coordinate-based fallback
+    -- The red button is approximately at (14, 14) from the top-left corner of the window
     local f = win:frame()
     local dx = mousePos.x - (f.x + 14)
     local dy = mousePos.y - (f.y + 14)
-    return (dx * dx + dy * dy) <= 144 -- raggio 12px
+    return (dx * dx + dy * dy) <= 144 -- radius 12px
 end
 
 --- DoNotClosePWA:start()
---- Avvia l'intercettazione dei click e delle scorciatoie da tastiera sulle PWA.
+--- Starts intercepting clicks and keyboard shortcuts on PWAs.
 function obj:start()
-    -- Intercetta i click del mouse sul pulsante rosso
+    -- Intercept mouse clicks on the red close button
     mouseTap = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(event)
         local app = hs.application.frontmostApplication()
         if not isPWA(app) then return false end
@@ -92,14 +92,14 @@ function obj:start()
         local mousePos = hs.mouse.absolutePosition()
 
         if isClickOnCloseButton(mousePos, win) then
-            logger.i("Intercettato close button su: " .. (app:name() or "?"))
+            logger.i("Intercepted close button on: " .. (app:name() or "?"))
             app:hide()
-            return true -- consuma l'evento (il click non raggiunge l'app)
+            return true -- consume the event (click does not reach the app)
         end
         return false
     end)
 
-    -- Intercetta Cmd+W e Cmd+Q
+    -- Intercept Cmd+W and Cmd+Q
     keyTap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
         local app = hs.application.frontmostApplication()
         if not isPWA(app) then return false end
@@ -109,14 +109,14 @@ function obj:start()
 
         if not flags.cmd or flags.ctrl then return false end
 
-        -- Cmd+Option+Q = esci davvero dall'app (non intercettare)
+        -- Cmd+Option+Q = actually quit the app (do not intercept)
         if flags.alt and key == 12 then return false end
 
-        -- Cmd+W (keyCode 13) → nascondi
-        -- Cmd+Q (keyCode 12) → nascondi
+        -- Cmd+W (keyCode 13) → hide
+        -- Cmd+Q (keyCode 12) → hide
         if not flags.alt and (key == 13 or key == 12) then
             local label = key == 13 and "W" or "Q"
-            logger.i("Intercettato Cmd+" .. label .. " su: " .. (app:name() or "?"))
+            logger.i("Intercepted Cmd+" .. label .. " on: " .. (app:name() or "?"))
             app:hide()
             return true
         end
@@ -126,34 +126,34 @@ function obj:start()
 
     mouseTap:start()
     keyTap:start()
-    logger.i("Avviato")
-    hs.alert.show("DoNotClosePWA attivo")
+    logger.i("Started")
+    hs.alert.show("DoNotClosePWA active")
     return self
 end
 
 --- DoNotClosePWA:stop()
---- Ferma l'intercettazione e ripristina il comportamento normale.
+--- Stops interception and restores normal behavior.
 function obj:stop()
     if mouseTap then mouseTap:stop(); mouseTap = nil end
     if keyTap then keyTap:stop(); keyTap = nil end
-    logger.i("Fermato")
-    hs.alert.show("DoNotClosePWA disattivato")
+    logger.i("Stopped")
+    hs.alert.show("DoNotClosePWA disabled")
     return self
 end
 
 --- DoNotClosePWA:addApp(name)
---- Aggiunge un'app per nome alla lista delle PWA.
+--- Adds an app by name to the PWA list.
 function obj:addApp(name)
     table.insert(self.additionalApps, name)
-    logger.i("Aggiunta app: " .. name)
+    logger.i("Added app: " .. name)
     return self
 end
 
 --- DoNotClosePWA:addPattern(pattern)
---- Aggiunge un pattern di bundle ID alla lista.
+--- Adds a bundle ID pattern to the list.
 function obj:addPattern(pattern)
     table.insert(self.pwaPatterns, pattern)
-    logger.i("Aggiunto pattern: " .. pattern)
+    logger.i("Added pattern: " .. pattern)
     return self
 end
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
-# DoNotClosePWA - Script di installazione
-# Installa lo Spoon Hammerspoon che previene la chiusura delle PWA
+# DoNotClosePWA - Installation script
+# Installs the Hammerspoon Spoon that prevents PWAs from closing
 # ============================================================
 
 set -e
@@ -11,92 +11,92 @@ SPOON_SRC="$SCRIPT_DIR/DoNotClosePWA.spoon"
 SPOON_DST="$HOME/.hammerspoon/Spoons/DoNotClosePWA.spoon"
 INIT_FILE="$HOME/.hammerspoon/init.lua"
 
-echo "=== DoNotClosePWA - Installazione ==="
+echo "=== DoNotClosePWA - Installation ==="
 echo ""
 
-# 1. Controlla se Hammerspoon e' installato
+# 1. Check if Hammerspoon is installed
 if [ -d "/Applications/Hammerspoon.app" ] || [ -d "$HOME/Applications/Hammerspoon.app" ]; then
-    echo "[OK] Hammerspoon trovato"
+    echo "[OK] Hammerspoon found"
 else
-    echo "[!] Hammerspoon non trovato."
+    echo "[!] Hammerspoon not found."
     echo ""
     if command -v brew &>/dev/null; then
-        echo "Installo Hammerspoon con Homebrew..."
+        echo "Installing Hammerspoon with Homebrew..."
         brew install --cask hammerspoon
-        echo "[OK] Hammerspoon installato"
+        echo "[OK] Hammerspoon installed"
     else
-        echo "Opzioni:"
-        echo "  1. Installa Homebrew (https://brew.sh) e poi riesegui questo script"
-        echo "  2. Scarica Hammerspoon da: https://www.hammerspoon.org/"
+        echo "Options:"
+        echo "  1. Install Homebrew (https://brew.sh) and then re-run this script"
+        echo "  2. Download Hammerspoon from: https://www.hammerspoon.org/"
         echo ""
-        echo "Dopo l'installazione, riesegui: bash install.sh"
+        echo "After installation, re-run: bash install.sh"
         exit 1
     fi
 fi
 
-# 2. Crea le directory necessarie
+# 2. Create necessary directories
 mkdir -p "$HOME/.hammerspoon/Spoons"
 
-# 3. Copia lo Spoon
+# 3. Copy the Spoon
 if [ -d "$SPOON_DST" ]; then
-    echo "[~] Aggiorno lo Spoon esistente..."
+    echo "[~] Updating existing Spoon..."
     rm -rf "$SPOON_DST"
 fi
 cp -r "$SPOON_SRC" "$SPOON_DST"
-echo "[OK] Spoon copiato in $SPOON_DST"
+echo "[OK] Spoon copied to $SPOON_DST"
 
-# 4. Configura init.lua
-SPOON_CONFIG='-- DoNotClosePWA: le PWA si nascondono invece di chiudersi
+# 4. Configure init.lua
+SPOON_CONFIG='-- DoNotClosePWA: PWAs are hidden instead of being closed
 hs.loadSpoon("DoNotClosePWA")
 spoon.DoNotClosePWA:start()
--- Per aggiungere PWA per nome: spoon.DoNotClosePWA:addApp("NomeApp")
--- Per disattivare: spoon.DoNotClosePWA:stop()
--- Per chiudere davvero una PWA: Cmd+Option+Q oppure Dock > tasto destro > Esci'
+-- To add a PWA by name: spoon.DoNotClosePWA:addApp("AppName")
+-- To disable: spoon.DoNotClosePWA:stop()
+-- To actually close a PWA: Cmd+Option+Q or Dock > right-click > Quit'
 
 if [ -f "$INIT_FILE" ]; then
     if grep -q "DoNotClosePWA" "$INIT_FILE"; then
-        echo "[OK] Configurazione gia' presente in init.lua"
+        echo "[OK] Configuration already present in init.lua"
     else
         echo "" >> "$INIT_FILE"
         echo "$SPOON_CONFIG" >> "$INIT_FILE"
-        echo "[OK] Configurazione aggiunta a init.lua"
+        echo "[OK] Configuration added to init.lua"
     fi
 else
     echo "$SPOON_CONFIG" > "$INIT_FILE"
-    echo "[OK] Creato init.lua con configurazione"
+    echo "[OK] Created init.lua with configuration"
 fi
 
-# 5. Ricarica Hammerspoon (se in esecuzione)
+# 5. Reload Hammerspoon (if running)
 if pgrep -q Hammerspoon; then
     echo ""
-    echo "Ricarico la configurazione di Hammerspoon..."
+    echo "Reloading Hammerspoon configuration..."
     open -g "hammerspoon://reloadconfig" 2>/dev/null || true
-    echo "[OK] Configurazione ricaricata"
+    echo "[OK] Configuration reloaded"
 else
     echo ""
-    echo "[!] Hammerspoon non e' in esecuzione."
-    echo "    Aprilo e poi ricarica la configurazione (icona menu > Reload Config)"
+    echo "[!] Hammerspoon is not running."
+    echo "    Open it and then reload the configuration (menu bar icon > Reload Config)"
 fi
 
 echo ""
 echo "============================================"
-echo " Installazione completata!"
+echo " Installation complete!"
 echo "============================================"
 echo ""
-echo " Come funziona:"
-echo "   - Click sul pulsante rosso di una PWA  -> la nasconde"
-echo "   - Cmd+W su una PWA                     -> la nasconde"
-echo "   - Cmd+Q su una PWA                     -> la nasconde"
-echo "   - Cmd+Option+Q su una PWA              -> la chiude davvero"
-echo "   - Dock > tasto destro > Esci           -> la chiude davvero"
+echo " How it works:"
+echo "   - Click the red button on a PWA          -> hides it"
+echo "   - Cmd+W on a PWA                         -> hides it"
+echo "   - Cmd+Q on a PWA                         -> hides it"
+echo "   - Cmd+Option+Q on a PWA                  -> actually closes it"
+echo "   - Dock > right-click > Quit              -> actually closes it"
 echo ""
-echo " IMPORTANTE: Hammerspoon ha bisogno dei permessi di Accessibilita'."
-echo " Vai in: Impostazioni di Sistema > Privacy e Sicurezza > Accessibilita'"
-echo " e assicurati che Hammerspoon sia abilitato."
+echo " IMPORTANT: Hammerspoon needs Accessibility permissions."
+echo " Go to: System Settings > Privacy & Security > Accessibility"
+echo " and make sure Hammerspoon is enabled."
 echo ""
-echo " PWA Edge Dev rilevate automaticamente:"
+echo " Automatically detected Edge Dev PWAs:"
 
-# Mostra le PWA trovate
+# Show found PWAs
 for app in "$HOME/Applications/Edge Apps.localized/"*.app; do
     if [ -f "$app/Contents/Info.plist" ]; then
         name=$(basename "$app" .app)
