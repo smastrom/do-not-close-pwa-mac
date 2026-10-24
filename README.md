@@ -4,7 +4,7 @@ A [Hammerspoon](https://www.hammerspoon.org/) Spoon that makes PWA windows on ma
 
 ## The Problem
 
-When you install a web app as a PWA (Progressive Web App) from Edge, Chrome, or other Chromium browsers, macOS treats it as a single-window app. Clicking the red close button - or pressing `Cmd+W` / `Cmd+Q` - **kills the entire process** instead of simply hiding the window, unlike native macOS apps (e.g. Finder, Messages, Music).
+When you install a web app as a PWA (Progressive Web App) using Safari’s Add to Dock, Edge, Chrome, or other Chromium browsers, macOS treats it as a single-window app. Clicking the red close button - or pressing `Cmd+W` / `Cmd+Q` - **kills the entire process** instead of simply hiding the window, unlike native macOS apps (e.g. Finder, Messages, Music).
 
 ## The Solution
 
@@ -68,6 +68,7 @@ PWAs are detected automatically by their **bundle ID pattern**. The following br
 
 | Browser | Bundle ID pattern | Example |
 |---|---|---|
+| **Safari** (Add to Dock) | `com.apple.Safari.WebApp.*` | `com.apple.Safari.WebApp.93A0AD2F-…` |
 | **Microsoft Edge** (all channels) | `com.microsoft.edgemac*.app.*` | `com.microsoft.edgemac.Dev.app.ingmankjgobdmjekjjochfcnpomocinf` |
 | **Google Chrome** (all channels) | `com.google.Chrome*.app.*` | `com.google.Chrome.app.abcdef123456` |
 | **Brave** | `com.brave.Browser*.app.*` | `com.brave.Browser.app.abcdef123456` |
@@ -128,9 +129,23 @@ spoon.DoNotClosePWA:start()  -- re-enable
 
 The Spoon uses two Hammerspoon [event taps](https://www.hammerspoon.org/docs/hs.eventtap.html):
 
-1. **Mouse tap** - listens for `leftMouseDown` events. When a click occurs, it checks if the frontmost app is a PWA and whether the click landed on the window's close button (using the macOS Accessibility API to find the real button position). If so, it hides the app and swallows the click.
+1. **Mouse tap** - uses Accessibility hit-testing at the click location to identify the real close button and its owning app, including background windows. It hides the PWA and consumes both mouse-down and mouse-up. No title-bar coordinates are guessed.
 
-2. **Keyboard tap** - listens for `keyDown` events. When `Cmd+W` or `Cmd+Q` is pressed in a PWA, it hides the app instead. `Cmd+Option+Q` is left untouched as an escape hatch to actually quit.
+2. **Keyboard tap** - listens for `keyDown` events. When `Cmd+W` or `Cmd+Q` is pressed in a PWA, it hides the app instead. `Cmd+Option+Q` explicitly requests a normal application quit.
+
+## Limitations and checks
+
+Only mouse close-button clicks and the listed keyboard shortcuts are intercepted. Menu-bar Close/Quit, Dock Quit, and external quit requests retain their normal behavior. Secure Input can prevent keyboard interception. If protection stops working, check Hammerspoon’s Accessibility permission and reload its configuration.
+
+Safari web apps require macOS Sonoma or later. Safari browser windows themselves are not intercepted.
+
+Run the mocked behavior checks with Lua 5.3+ from the repository directory:
+
+```bash
+lua tests/behavior.lua
+```
+
+These checks do not replace a live check: open a web app, try Cmd+W and the red button (also while another app is active), and verify that clicking its Dock icon restores the existing window.
 
 ## Uninstall
 

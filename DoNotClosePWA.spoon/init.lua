@@ -11,7 +11,7 @@ obj.__index = obj
 
 -- Metadata
 obj.name = "DoNotClosePWA"
-obj.version = "1.0"
+obj.version = "1.1"
 obj.author = "PWA Guardian"
 obj.license = "MIT"
 
@@ -19,6 +19,7 @@ obj.license = "MIT"
 --- Bundle ID patterns (Lua patterns) that identify PWAs.
 --- Patterns use % as escape for literal dots.
 obj.pwaPatterns = {
+    "^com%.apple%.Safari%.WebApp%.",       -- Safari Add to Dock web apps
     "^com%.google%.Chrome.*app%.",          -- Chrome PWAs (stable, beta, canary)
     "^com%.microsoft%.edgemac.*app%.",       -- Edge PWAs (stable, dev, beta)
     "^com%.brave%.Browser.*app%.",           -- Brave PWAs
@@ -51,52 +52,47 @@ local function isPWA(app)
     return false
 end
 
---- Checks if the mouse click is on the window's close (red) button.
---- Uses Accessibility API first (more accurate), then falls back to coordinates.
-local function isClickOnCloseButton(mousePos, win)
-    -- Method 1: Accessibility API (finds the real button)
-    local ok, axWin = pcall(hs.axuielement.windowElement, win)
-    if ok and axWin then
-        local closeBtn = axWin:attributeValue("AXCloseButton")
-        if closeBtn then
-            local btnPos = closeBtn:attributeValue("AXPosition")
-            local btnSize = closeBtn:attributeValue("AXSize")
-            if btnPos and btnSize then
-                return mousePos.x >= btnPos.x
-                    and mousePos.x <= btnPos.x + btnSize.w
-                    and mousePos.y >= btnPos.y
-                    and mousePos.y <= btnPos.y + btnSize.h
-            end
+-- Hit-test the actual element under the pointer, including background windows.
+-- Avoid guessed title-bar coordinates: Safari's toolbar geometry can change.
+local function closeButtonApplication(position)
+    local element = hs.axuielement.systemElementAtPosition(position)
+    for _ = 1, 4 do
+        if not element then return nil end
+        if element:attributeValue("AXSubrole") == "AXCloseButton" then
+            local pid = element:pid()
+            return pid and hs.application.applicationForPID(pid) or nil
         end
+        element = element:attributeValue("AXParent")
     end
-
-    -- Method 2: Coordinate-based fallback
-    -- The red button is approximately at (14, 14) from the top-left corner of the window
-    local f = win:frame()
-    local dx = mousePos.x - (f.x + 14)
-    local dy = mousePos.y - (f.y + 14)
-    return (dx * dx + dy * dy) <= 144 -- radius 12px
 end
 
 --- DoNotClosePWA:start()
 --- Starts intercepting clicks and keyboard shortcuts on PWAs.
 function obj:start()
-    -- Intercept mouse clicks on the red close button
-    mouseTap = hs.eventtap.new({ hs.eventtap.event.types.leftMouseDown }, function(event)
-        local app = hs.application.frontmostApplication()
-        if not isPWA(app) then return false end
-
-        local win = app:focusedWindow()
-        if not win then return false end
-
-        local mousePos = hs.mouse.absolutePosition()
-
-        if isClickOnCloseButton(mousePos, win) then
-            logger.i("Intercepted close button on: " .. (app:name() or "?"))
-            app:hide()
-            return true -- consume the event (click does not reach the app)
+    -- Calling start twice must not leave orphaned event taps running.
+    if mouseTap then mouseTap:stop() end
+    if keyTap then keyTap:stop() end
+    local swallowMouseUp = false
+    mouseTap = hs.eventtap.new({
+        hs.eventtap.event.types.leftMouseDown,
+        hs.eventtap.event.types.leftMouseUp,
+    }, function(event)
+        if event:getType() == hs.eventtap.event.types.leftMouseUp then
+            local swallow = swallowMouseUp
+            swallowMouseUp = false
+            return swallow
         end
-        return false
+        swallowMouseUp = false
+        local ok, app = pcall(closeButtonApplication, event:location())
+        if not ok then
+            logger.w("Close-button Accessibility query failed: " .. tostring(app))
+            return false
+        end
+        if not isPWA(app) then return false end
+        if not app:hide() then return false end
+        swallowMouseUp = true
+        logger.i("Intercepted close button on: " .. (app:name() or "?"))
+        return true
     end)
 
     -- Intercept Cmd+W and Cmd+Q
@@ -109,16 +105,19 @@ function obj:start()
 
         if not flags.cmd or flags.ctrl then return false end
 
-        -- Cmd+Option+Q = actually quit the app (do not intercept)
-        if flags.alt and key == 12 then return false end
+        -- Request a normal quit; passing this shortcut through is not enough
+        -- because Safari web apps do not necessarily bind Cmd+Option+Q.
+        if flags.alt and not flags.shift and key == hs.keycodes.map.q then
+            app:kill()
+            return true
+        end
 
         -- Cmd+W (keyCode 13) → hide
         -- Cmd+Q (keyCode 12) → hide
-        if not flags.alt and (key == 13 or key == 12) then
-            local label = key == 13 and "W" or "Q"
+        if not flags.alt and (key == hs.keycodes.map.w or key == hs.keycodes.map.q) then
+            local label = key == hs.keycodes.map.w and "W" or "Q"
             logger.i("Intercepted Cmd+" .. label .. " on: " .. (app:name() or "?"))
-            app:hide()
-            return true
+            return app:hide() and true or false
         end
 
         return false
