@@ -1,185 +1,116 @@
 # DoNotClosePWA for Mac
 
-A [Hammerspoon](https://www.hammerspoon.org/) Spoon that makes PWA windows on macOS behave like native apps: **clicking the red close button hides the window instead of quitting the app**.
+Keep macOS web apps running when you close their windows. DoNotClosePWA is a [Hammerspoon](https://www.hammerspoon.org/) Spoon that hides the app when you click its red close button or press `Cmd+W` or `Cmd+Q`. Click its Dock icon to bring it back.
 
-## The Problem
+## Behavior
 
-When you install a web app as a PWA (Progressive Web App) using Safari’s Add to Dock, Edge, Chrome, or other Chromium browsers, macOS treats it as a single-window app. Clicking the red close button - or pressing `Cmd+W` / `Cmd+Q` - **kills the entire process** instead of simply hiding the window, unlike native macOS apps (e.g. Finder, Messages, Music).
+| Action in a detected web app | Result |
+| --- | --- |
+| Click the red close button | Hide the app, including its other windows |
+| `Cmd+W` or `Cmd+Q` | Hide the app |
+| `Cmd+Option+Q` | Request a normal quit |
+| Close or Quit from the app menu | Use the app's normal behavior |
+| Quit from the Dock | Use the app's normal behavior |
 
-## The Solution
+The close button also works on background windows. Keyboard shortcuts apply to the active app.
 
-DoNotClosePWA intercepts close events on PWA windows and **hides the app instead of closing it**. The app stays alive in the Dock and you can bring it back with a single click - just like a real macOS app.
+## Install
 
-### What gets intercepted
+You need macOS, Hammerspoon, and Accessibility access for Hammerspoon. Safari's Add to Dock web apps require macOS Sonoma (14) or later.
 
-| Action | Normal PWA behavior | With DoNotClosePWA |
-|---|---|---|
-| Click red button | Quits the app | Hides the window |
-| `Cmd+W` | Quits the app | Hides the window |
-| `Cmd+Q` | Quits the app | Hides the window |
-| `Cmd+Option+Q` | - | **Actually quits** (escape hatch) |
-| Dock > Right-click > Quit | Quits the app | Quits the app (not intercepted) |
-
-## What is a Hammerspoon Spoon?
-
-[Hammerspoon](https://www.hammerspoon.org/) is a free, open-source macOS automation tool that lets you write Lua scripts to control your system. A **Spoon** is Hammerspoon's plugin format - a self-contained module that you drop into `~/.hammerspoon/Spoons/` and load from your config.
-
-Think of it like: Hammerspoon is the engine, Spoons are the plugins.
-
-## Installation
-
-### Quick install
-
-```bash
+```sh
 git clone https://github.com/smastrom/do-not-close-pwa-mac.git
 cd do-not-close-pwa-mac
 bash install.sh
 ```
 
-The install script will:
-1. Install Hammerspoon via Homebrew (if not already installed)
-2. Copy the Spoon to `~/.hammerspoon/Spoons/`
-3. Add the startup config to `~/.hammerspoon/init.lua`
-4. Reload Hammerspoon if it's running
+The installer copies the Spoon to `~/.hammerspoon/Spoons/`, adds startup lines to `~/.hammerspoon/init.lua` if needed, and reloads Hammerspoon if it is running. If Hammerspoon is missing, it tries to install it with Homebrew. Without Homebrew, install Hammerspoon yourself and rerun the script.
+
+Enable Hammerspoon in **System Settings > Privacy & Security > Accessibility**. Open Hammerspoon if it is not running, then choose **Reload Config** from its menu bar icon.
 
 ### Manual install
 
-1. Copy `DoNotClosePWA.spoon/` to `~/.hammerspoon/Spoons/`
-2. Add this to your `~/.hammerspoon/init.lua`:
+With Hammerspoon installed, run these commands from the repository:
+
+```sh
+mkdir -p ~/.hammerspoon/Spoons
+cp -R DoNotClosePWA.spoon ~/.hammerspoon/Spoons/
+```
+
+Add this to `~/.hammerspoon/init.lua`, grant Accessibility access, and reload the config:
 
 ```lua
 hs.loadSpoon("DoNotClosePWA")
 spoon.DoNotClosePWA:start()
 ```
 
-3. Reload Hammerspoon (menu bar icon > Reload Config)
+## App detection
 
-### Grant Accessibility permissions
+The Spoon recognizes these bundle ID patterns automatically:
 
-Hammerspoon needs Accessibility access to intercept clicks and keyboard shortcuts:
+| Browser | Bundle ID family |
+| --- | --- |
+| Safari (Add to Dock) | `com.apple.Safari.WebApp.*` |
+| Microsoft Edge | `com.microsoft.edgemac*.app.*` |
+| Google Chrome | `com.google.Chrome*.app.*` |
+| Brave | `com.brave.Browser*.app.*` |
+| Vivaldi | `com.vivaldi.Vivaldi*.app.*` |
 
-**System Settings > Privacy & Security > Accessibility > enable Hammerspoon**
+The Chromium patterns include channel variants such as Edge Dev and Chrome Beta. Regular browser windows are unaffected.
 
-Without this, the Spoon won't be able to intercept any events.
-
-## Supported Browsers
-
-PWAs are detected automatically by their **bundle ID pattern**. The following browsers are supported out of the box:
-
-| Browser | Bundle ID pattern | Example |
-|---|---|---|
-| **Safari** (Add to Dock) | `com.apple.Safari.WebApp.*` | `com.apple.Safari.WebApp.93A0AD2F-…` |
-| **Microsoft Edge** (all channels) | `com.microsoft.edgemac*.app.*` | `com.microsoft.edgemac.Dev.app.ingmankjgobdmjekjjochfcnpomocinf` |
-| **Google Chrome** (all channels) | `com.google.Chrome*.app.*` | `com.google.Chrome.app.abcdef123456` |
-| **Brave** | `com.brave.Browser*.app.*` | `com.brave.Browser.app.abcdef123456` |
-| **Vivaldi** | `com.vivaldi.Vivaldi*.app.*` | `com.vivaldi.Vivaldi.app.abcdef123456` |
-
-This means **all PWAs from these browsers are automatically handled** - no manual configuration needed.
-
-## Configuration
-
-### Adding an app by name
-
-If a PWA is not detected automatically, you can add it by name in your `~/.hammerspoon/init.lua`:
+To include another app, add its exact name or a Lua bundle ID pattern before `start()` in your Hammerspoon config:
 
 ```lua
 hs.loadSpoon("DoNotClosePWA")
 spoon.DoNotClosePWA:addApp("My Custom App")
-spoon.DoNotClosePWA:start()
-```
-
-### Adding a custom bundle ID pattern
-
-To support a new browser or a custom Chromium build:
-
-```lua
-hs.loadSpoon("DoNotClosePWA")
 spoon.DoNotClosePWA:addPattern("^com%.example%.mybrowser.*app%.")
 spoon.DoNotClosePWA:start()
 ```
 
-> **Note:** Lua patterns use `%` to escape special characters. A literal dot is `%.`, and `.*` matches any sequence of characters.
+In a Lua pattern, `%.` matches a literal dot and `.*` matches any sequence of characters. `addApp()` matches the app name exactly.
 
-### Finding a PWA's bundle ID
+To read an installed app's bundle ID, replace the path below with its `.app` path:
 
-To find the bundle ID of any installed PWA:
-
-```bash
-# List all Edge PWAs
-for app in ~/Applications/Edge\ Apps.localized/*.app; do
-    /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist" 2>/dev/null
-done
-
-# List all Chrome PWAs
-for app in ~/Applications/Chrome\ Apps.localized/*.app; do
-    /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$app/Contents/Info.plist" 2>/dev/null
-done
+```sh
+/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' '/path/to/My App.app/Contents/Info.plist'
 ```
 
-### Temporarily disabling
+## Pause and resume
 
-From the Hammerspoon console (menu bar icon > Console):
+Open the Hammerspoon console from its menu bar icon and run:
 
 ```lua
-spoon.DoNotClosePWA:stop()   -- disable
-spoon.DoNotClosePWA:start()  -- re-enable
+spoon.DoNotClosePWA:stop()
+spoon.DoNotClosePWA:start()
 ```
 
-## How It Works
+Use `stop()` to pause interception and `start()` to resume it.
 
-The Spoon uses two Hammerspoon [event taps](https://www.hammerspoon.org/docs/hs.eventtap.html):
+## How it works
 
-1. **Mouse tap** - uses Accessibility hit-testing at the click location to identify the real close button and its owning app, including background windows. It hides the PWA and consumes both mouse-down and mouse-up. No title-bar coordinates are guessed.
+A mouse event tap uses Accessibility hit-testing to find the close button and its owning app. When that app matches, the Spoon hides it and consumes the mouse-down and mouse-up events. A keyboard event tap handles the shortcuts above.
 
-2. **Keyboard tap** - listens for `keyDown` events. When `Cmd+W` or `Cmd+Q` is pressed in a PWA, it hides the app instead. `Cmd+Option+Q` explicitly requests a normal application quit.
+App-menu commands, Dock commands, and quit requests from other processes keep their normal behavior. Secure Input can block keyboard interception. If interception stops working, check Hammerspoon's Accessibility permission and reload its config.
 
-## Limitations and checks
+## Checks
 
-Only mouse close-button clicks and the listed keyboard shortcuts are intercepted. Menu-bar Close/Quit, Dock Quit, and external quit requests retain their normal behavior. Secure Input can prevent keyboard interception. If protection stops working, check Hammerspoon’s Accessibility permission and reload its configuration.
+Run the mocked behavior checks with Lua 5.3 or later from the repository root:
 
-Safari web apps require macOS Sonoma or later. Safari browser windows themselves are not intercepted.
-
-Run the mocked behavior checks with Lua 5.3+ from the repository directory:
-
-```bash
+```sh
 lua tests/behavior.lua
 ```
 
-These checks do not replace a live check: open a web app, try Cmd+W and the red button (also while another app is active), and verify that clicking its Dock icon restores the existing window.
+For a live check, open a web app and try the red close button, `Cmd+W`, and `Cmd+Q`. Click its Dock icon after each action to confirm the existing app returns. Try the close button while another app is active, then verify that `Cmd+Option+Q` quits the web app.
 
 ## Uninstall
 
-### Quick uninstall
+Remove the `DoNotClosePWA` lines from `~/.hammerspoon/init.lua`, then delete the Spoon:
 
-```bash
-# Remove the Spoon
+```sh
 rm -rf ~/.hammerspoon/Spoons/DoNotClosePWA.spoon
-
-# Remove the config lines from init.lua
-sed -i '' '/DoNotClosePWA/d' ~/.hammerspoon/init.lua
-
-# Reload Hammerspoon
-open -g "hammerspoon://reloadconfig"
 ```
 
-### Manual uninstall
-
-1. Delete `~/.hammerspoon/Spoons/DoNotClosePWA.spoon/`
-2. Remove the `DoNotClosePWA` lines from `~/.hammerspoon/init.lua`
-3. Reload Hammerspoon (menu bar icon > Reload Config)
-
-If you also want to remove Hammerspoon entirely:
-
-```bash
-brew uninstall --cask hammerspoon
-rm -rf ~/.hammerspoon
-```
-
-## Requirements
-
-- macOS 12+ (Monterey or later)
-- [Hammerspoon](https://www.hammerspoon.org/) (installable via `brew install --cask hammerspoon`)
-- Accessibility permissions for Hammerspoon
+Reload Hammerspoon's config to stop any active event taps.
 
 ## License
 
